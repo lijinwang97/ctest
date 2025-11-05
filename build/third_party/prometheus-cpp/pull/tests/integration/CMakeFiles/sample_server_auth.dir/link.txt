@@ -1,0 +1,1 @@
+/usr/bin/c++  -g   CMakeFiles/sample_server_auth.dir/sample_server_auth.cc.o  -o ../../../bin/sample_server_auth  ../../../lib/libprometheus-cpp-pull.a ../../../lib/libprometheus-cpp-core.a -lpthread -lrt /usr/lib/x86_64-linux-gnu/libz.so 

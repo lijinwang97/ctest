@@ -1,0 +1,1 @@
+/usr/bin/c++  -g   CMakeFiles/sample_client.dir/sample_client.cc.o  -o ../../../bin/sample_client  ../../../lib/libprometheus-cpp-push.a ../../../lib/libprometheus-cpp-core.a /usr/lib/x86_64-linux-gnu/libcurl.so -lpthread -lrt 

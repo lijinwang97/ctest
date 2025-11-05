@@ -1,0 +1,2 @@
+/usr/bin/ar qc ../lib/libprometheus-cpp-push.a  CMakeFiles/push.dir/src/gateway.cc.o CMakeFiles/push.dir/src/detail/curl_wrapper.cc.o CMakeFiles/push.dir/src/detail/label_encoder.cc.o
+/usr/bin/ranlib ../lib/libprometheus-cpp-push.a

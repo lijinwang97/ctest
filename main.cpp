@@ -66,7 +66,8 @@ inline std::string packet_to_string(const AVPacket *pkt) {
 int main() {
   av_log_set_level(AV_LOG_DEBUG);
 
-  const char *input_file = "/data1/lijinwang/ctest/build/input2.mp3";
+  const char *input_file = "/data1/lijinwang/ctest/build/input_44100_stereo.mp3";
+  // const char *input_file = "/data1/lijinwang/ctest/build/input2.mp3";
   const char *output_file = "output.mp3";
 
   // 打开输入文件
@@ -94,6 +95,11 @@ int main() {
   AVStream *in_stream = in_fmt->streams[audio_stream_index];
   int sample_rate = in_stream->codecpar->sample_rate;
   int channels = in_stream->codecpar->channels;
+  AVSampleFormat sample_fmt = (AVSampleFormat)in_stream->codecpar->format;
+
+  std::cout << "🎧 Input stream: sample_rate=" << sample_rate
+            << ", channels=" << channels
+            << ", format=" << av_get_sample_fmt_name(sample_fmt) << std::endl;
 
   // ✅ 初始化 AudioAfade（前 200 帧淡入）
   // AudioAfade afade(sample_rate, channels, AudioAfade::FADE_IN, 200);
@@ -139,8 +145,8 @@ int main() {
       std::cout << "🎬 Fade-in triggered at frame " << frame_count << std::endl;
       int sample_rate = in_stream->codecpar->sample_rate;
       int channels = in_stream->codecpar->channels;
-      afade = std::make_unique<AudioAfade>(sample_rate, channels,
-                                           AudioAfade::FADE_OUT, 100);
+      afade = std::make_unique<AudioAfade>(sample_rate, channels, sample_fmt,
+                                           AudioAfade::FADE_IN, 100);
       fading = true;
     }
 

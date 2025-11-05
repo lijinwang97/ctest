@@ -15,7 +15,7 @@ class AudioAfade {
 public:
   enum FadeType { FADE_NONE, FADE_IN, FADE_OUT };
 
-  AudioAfade(int sample_rate, int channels, FadeType type, int total_frames);
+  AudioAfade(int sample_rate, int channels,AVSampleFormat sample_fmt, FadeType type, int total_frames);
   ~AudioAfade();
 
   // 处理一段 AAC 数据（可能包含多帧）
@@ -37,6 +37,8 @@ private:
   FadeType type_;
   int sample_rate_;
   int channels_;
+  AVSampleFormat sample_fmt_;
+
   int total_frames_; // 多少帧淡入或淡出
   int64_t pts_counter_ = 0; // 维护连续时间戳
 };

@@ -57,9 +57,7 @@ int testAvMetrics() {
   }
 }
 
-int testAfade() {
-  
-}
+int testAfade() {}
 
 inline std::string packet_to_string(const AVPacket *pkt) {
   return std::string(reinterpret_cast<const char *>(pkt->data), pkt->size);
@@ -98,7 +96,7 @@ int main() {
   int channels = in_stream->codecpar->channels;
 
   // ✅ 初始化 AudioAfade（前 200 帧淡入）
-  AudioAfade afade(sample_rate, channels, AudioAfade::FADE_IN, 200);
+  // AudioAfade afade(sample_rate, channels, AudioAfade::FADE_IN, 200);
 
   // 初始化输出封装
   AVFormatContext *out_fmt = nullptr;
@@ -123,22 +121,55 @@ int main() {
 
   avformat_write_header(out_fmt, nullptr);
 
+  int frame_count = 0;
+  bool fading = false;
+  std::unique_ptr<AudioAfade> afade;
+
   AVPacket pkt;
   av_init_packet(&pkt);
 
-  int frame_count = 0;
   while (av_read_frame(in_fmt, &pkt) >= 0) {
-    if (pkt.stream_index == audio_stream_index) {
-      AVPacket out_pkt;
-        av_init_packet(&out_pkt);
-
-      if (afade.Process(&pkt, &out_pkt)) {
-            // 成功处理后，写入输出文件
-            av_interleaved_write_frame(out_fmt, &out_pkt);
-        }
-
-      frame_count++;
+    if (pkt.stream_index != audio_stream_index) {
+      av_packet_unref(&pkt);
+      continue;
     }
+
+    frame_count++;
+    if (frame_count == 100) {
+      std::cout << "🎬 Fade-in triggered at frame " << frame_count << std::endl;
+      int sample_rate = in_stream->codecpar->sample_rate;
+      int channels = in_stream->codecpar->channels;
+      afade = std::make_unique<AudioAfade>(sample_rate, channels,
+                                           AudioAfade::FADE_OUT, 100);
+      fading = true;
+    }
+
+    if (fading && afade) {
+      AVPacket faded_pkt;
+      av_init_packet(&faded_pkt);
+
+      afade->Process(&pkt, &faded_pkt);
+
+      // 写入渐入后的包
+      if (faded_pkt.size > 0) {
+        faded_pkt.stream_index = 0;
+        av_interleaved_write_frame(out_fmt, &faded_pkt);
+      }
+
+      av_packet_unref(&faded_pkt);
+
+      // 当淡入200帧后销毁
+      if (frame_count >= 300) {
+        std::cout << "✅ Fade-in finished at frame " << frame_count << std::endl;
+        fading = false;
+        afade.reset();
+      }
+    } else {
+      // 🟢 正常写入
+      pkt.stream_index = 0;
+      av_interleaved_write_frame(out_fmt, &pkt);
+    }
+
     av_packet_unref(&pkt);
   }
 
@@ -150,7 +181,6 @@ int main() {
     avio_closep(&out_fmt->pb);
   avformat_free_context(out_fmt);
 
-  std::cout << "✅ 输出完成: " << output_file
-            << "（已应用前 200 帧淡入效果）\n";
+  std::cout << "✅ 输出完成: " << output_file << "（已应用前 200 帧淡入效果）\n";
   return 0;
 }

@@ -32,6 +32,9 @@ set(CMAKE_MAKEFILE_DEPENDS
   "../third_party/prometheus-cpp/util/CMakeLists.txt"
   "../third_party/prometheus-cpp/util/tests/CMakeLists.txt"
   "../third_party/prometheus-cpp/util/tests/unit/CMakeLists.txt"
+  "../third_party/spdlog-1.10.0/CMakeLists.txt"
+  "../third_party/spdlog-1.10.0/cmake/ide.cmake"
+  "../third_party/spdlog-1.10.0/cmake/utils.cmake"
   "/usr/share/cmake-3.16/Modules/BasicConfigVersion-SameMajorVersion.cmake.in"
   "/usr/share/cmake-3.16/Modules/CMakeCInformation.cmake"
   "/usr/share/cmake-3.16/Modules/CMakeCXXInformation.cmake"
@@ -48,6 +51,7 @@ set(CMAKE_MAKEFILE_DEPENDS
   "/usr/share/cmake-3.16/Modules/CheckCXXCompilerFlag.cmake"
   "/usr/share/cmake-3.16/Modules/CheckCXXSourceCompiles.cmake"
   "/usr/share/cmake-3.16/Modules/CheckIncludeFile.cmake"
+  "/usr/share/cmake-3.16/Modules/CheckIncludeFileCXX.cmake"
   "/usr/share/cmake-3.16/Modules/CheckLibraryExists.cmake"
   "/usr/share/cmake-3.16/Modules/Compiler/CMakeCommonCompilerMacros.cmake"
   "/usr/share/cmake-3.16/Modules/Compiler/GNU-C.cmake"
@@ -96,6 +100,7 @@ set(CMAKE_MAKEFILE_PRODUCTS
   "third_party/prometheus-cpp/push/tests/CMakeFiles/CMakeDirectoryInformation.cmake"
   "third_party/prometheus-cpp/push/tests/integration/CMakeFiles/CMakeDirectoryInformation.cmake"
   "third_party/prometheus-cpp/push/tests/internal/CMakeFiles/CMakeDirectoryInformation.cmake"
+  "third_party/spdlog-1.10.0/CMakeFiles/CMakeDirectoryInformation.cmake"
   )
 
 # Dependency information for all targets:
@@ -115,4 +120,5 @@ set(CMAKE_DEPEND_INFO_FILES
   "third_party/prometheus-cpp/push/CMakeFiles/push.dir/DependInfo.cmake"
   "third_party/prometheus-cpp/push/tests/integration/CMakeFiles/sample_client.dir/DependInfo.cmake"
   "third_party/prometheus-cpp/push/tests/internal/CMakeFiles/prometheus_push_internal_test.dir/DependInfo.cmake"
+  "third_party/spdlog-1.10.0/CMakeFiles/spdlog.dir/DependInfo.cmake"
   )

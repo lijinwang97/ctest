@@ -351,6 +351,19 @@ prometheus_push_internal_test/fast:
 	$(MAKE) -f third_party/prometheus-cpp/push/tests/internal/CMakeFiles/prometheus_push_internal_test.dir/build.make third_party/prometheus-cpp/push/tests/internal/CMakeFiles/prometheus_push_internal_test.dir/build
 .PHONY : prometheus_push_internal_test/fast
 
+#=============================================================================
+# Target rules for targets named spdlog
+
+# Build rule for target.
+spdlog: cmake_check_build_system
+	$(MAKE) -f CMakeFiles/Makefile2 spdlog
+.PHONY : spdlog
+
+# fast build rule for target.
+spdlog/fast:
+	$(MAKE) -f third_party/spdlog-1.10.0/CMakeFiles/spdlog.dir/build.make third_party/spdlog-1.10.0/CMakeFiles/spdlog.dir/build
+.PHONY : spdlog/fast
+
 audio_afade.o: audio_afade.cc.o
 
 .PHONY : audio_afade.o
@@ -404,6 +417,33 @@ av_metrics.s: av_metrics.cc.s
 av_metrics.cc.s:
 	$(MAKE) -f CMakeFiles/myapp.dir/build.make CMakeFiles/myapp.dir/av_metrics.cc.s
 .PHONY : av_metrics.cc.s
+
+logger.o: logger.cc.o
+
+.PHONY : logger.o
+
+# target to build an object file
+logger.cc.o:
+	$(MAKE) -f CMakeFiles/myapp.dir/build.make CMakeFiles/myapp.dir/logger.cc.o
+.PHONY : logger.cc.o
+
+logger.i: logger.cc.i
+
+.PHONY : logger.i
+
+# target to preprocess a source file
+logger.cc.i:
+	$(MAKE) -f CMakeFiles/myapp.dir/build.make CMakeFiles/myapp.dir/logger.cc.i
+.PHONY : logger.cc.i
+
+logger.s: logger.cc.s
+
+.PHONY : logger.s
+
+# target to generate assembly for a file
+logger.cc.s:
+	$(MAKE) -f CMakeFiles/myapp.dir/build.make CMakeFiles/myapp.dir/logger.cc.s
+.PHONY : logger.cc.s
 
 main.o: main.cpp.o
 
@@ -459,12 +499,16 @@ help:
 	@echo "... push"
 	@echo "... sample_client"
 	@echo "... prometheus_push_internal_test"
+	@echo "... spdlog"
 	@echo "... audio_afade.o"
 	@echo "... audio_afade.i"
 	@echo "... audio_afade.s"
 	@echo "... av_metrics.o"
 	@echo "... av_metrics.i"
 	@echo "... av_metrics.s"
+	@echo "... logger.o"
+	@echo "... logger.i"
+	@echo "... logger.s"
 	@echo "... main.o"
 	@echo "... main.i"
 	@echo "... main.s"

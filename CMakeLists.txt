@@ -14,6 +14,9 @@ add_subdirectory(third_party/prometheus-cpp)
 
 find_package(PkgConfig REQUIRED)
 
+add_subdirectory(third_party/spdlog-1.10.0)
+include_directories(third_party/spdlog-1.10.0/include)
+
 # 使用 pkg-config 查找 FFmpeg 各组件
 pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
   libavcodec
@@ -24,7 +27,7 @@ pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET
 )
 
 # 添加源文件
-add_executable(myapp ./main.cpp av_metrics.cc audio_afade.cc)
+add_executable(myapp ./main.cpp av_metrics.cc audio_afade.cc logger.cc)
 
 target_link_libraries(myapp
   PRIVATE

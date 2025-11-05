@@ -59,6 +59,10 @@
         "cinttypes": "cpp",
         "typeinfo": "cpp",
         "variant": "cpp",
-        "bit": "cpp"
+        "bit": "cpp",
+        "bitset": "cpp",
+        "charconv": "cpp",
+        "regex": "cpp",
+        "shared_mutex": "cpp"
     }
 }

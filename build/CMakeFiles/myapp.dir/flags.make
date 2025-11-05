@@ -6,5 +6,5 @@ CXX_FLAGS = -g   -std=gnu++17
 
 CXX_DEFINES = 
 
-CXX_INCLUDES = -I/data1/lijinwang/ctest/third_party/prometheus-cpp/core/include -I/data1/lijinwang/ctest/build/third_party/prometheus-cpp/core/include -I/data1/lijinwang/ctest/third_party/prometheus-cpp/pull/include -I/data1/lijinwang/ctest/build/third_party/prometheus-cpp/pull/include 
+CXX_INCLUDES = -I/data1/lijinwang/ctest/third_party/spdlog-1.10.0/include -I/data1/lijinwang/ctest/third_party/prometheus-cpp/core/include -I/data1/lijinwang/ctest/build/third_party/prometheus-cpp/core/include -I/data1/lijinwang/ctest/third_party/prometheus-cpp/pull/include -I/data1/lijinwang/ctest/build/third_party/prometheus-cpp/pull/include 
 

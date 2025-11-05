@@ -1,4 +1,5 @@
 #include "audio_afade.h"
+#include "logger.h"
 #include <algorithm>
 #include <iostream>
 
@@ -7,23 +8,20 @@ AudioAfade::AudioAfade(int sample_rate, int channels, AVSampleFormat sample_fmt,
     : sample_rate_(sample_rate), channels_(channels), sample_fmt_(sample_fmt),
       type_(type), total_frames_(total_frames) {
 
-  std::cout << "🎬 [AudioAfade Init] sample_rate=" << sample_rate
-            << ", channels=" << channels << ", total_frames=" << total_frames
-            << std::endl;
+  LOG_INFO("🎬 [AudioAfade Init] sample_rate={}, channels={}, total_frames={}",
+           sample_rate, channels, total_frames);
 
-  // ==== 初始化解码器 ====
   const AVCodec *dec = avcodec_find_decoder(AV_CODEC_ID_MP3);
   dec_ctx_ = avcodec_alloc_context3(dec);
   avcodec_open2(dec_ctx_, dec, nullptr);
 
-  std::cout << "✅ MP3 decoder initialized" << std::endl;
-  std::cout << "   🔹 Decoder info:" << std::endl;
-  std::cout << "      sample_fmt: "
-            << av_get_sample_fmt_name(dec_ctx_->sample_fmt) << std::endl;
-  std::cout << "      sample_rate: " << dec_ctx_->sample_rate << std::endl;
-  std::cout << "      channels: " << dec_ctx_->channels << " (layout=0x"
-            << std::hex << dec_ctx_->channel_layout << std::dec << ")"
-            << std::endl;
+  LOG_INFO("✅ MP3 decoder initialized");
+  LOG_INFO("   🔹 Decoder info:");
+  LOG_INFO("      sample_fmt: {}",
+           av_get_sample_fmt_name(dec_ctx_->sample_fmt));
+  LOG_INFO("      sample_rate: {}", dec_ctx_->sample_rate);
+  LOG_INFO("      channels: {} (layout=0x{:x})", dec_ctx_->channels,
+           dec_ctx_->channel_layout);
 
   // ==== 初始化编码器 ====
   const AVCodec *enc = avcodec_find_encoder(AV_CODEC_ID_MP3);
@@ -34,26 +32,24 @@ AudioAfade::AudioAfade(int sample_rate, int channels, AVSampleFormat sample_fmt,
   enc_ctx_->bit_rate = 128000;
   enc_ctx_->sample_fmt = sample_fmt_;
   if (avcodec_open2(enc_ctx_, enc, nullptr) < 0) {
-    std::cerr << "❌ Failed to open MP3 encoder" << std::endl;
+    LOG_ERROR("❌ Failed to open MP3 encoder");
     return;
   }
 
-  std::cout << "✅ MP3 encoder initialized" << std::endl;
-  std::cout << "   🔹 Encoder info:" << std::endl;
-  std::cout << "      sample_fmt: "
-            << av_get_sample_fmt_name(enc_ctx_->sample_fmt) << std::endl;
-  std::cout << "      sample_rate: " << enc_ctx_->sample_rate << std::endl;
-  std::cout << "      channels: " << enc_ctx_->channels << " (layout=0x"
-            << std::hex << enc_ctx_->channel_layout << std::dec << ")"
-            << std::endl;
+  LOG_INFO("✅ MP3 encoder initialized");
+  LOG_INFO("   🔹 Encoder info:");
+  LOG_INFO("      sample_fmt: {}",
+           av_get_sample_fmt_name(enc_ctx_->sample_fmt));
+  LOG_INFO("      sample_rate: {}", enc_ctx_->sample_rate);
+  LOG_INFO("      channels: {} (layout=0x{:x})", enc_ctx_->channels,
+           enc_ctx_->channel_layout);
 
   if (dec_ctx_->sample_fmt != enc_ctx_->sample_fmt ||
       dec_ctx_->sample_rate != enc_ctx_->sample_rate ||
       dec_ctx_->channels != enc_ctx_->channels) {
-    std::cerr << "⚠️  Warning: decoder and encoder audio formats differ!"
-              << std::endl;
+    LOG_ERROR("⚠️  Warning: decoder and encoder audio formats differ!");
   } else {
-    std::cout << "✅ Input/Output formats are perfectly matched!" << std::endl;
+    LOG_INFO("✅ Input/Output formats are perfectly matched!");
   }
 
   // ==== 初始化滤镜 ====
@@ -86,10 +82,10 @@ bool AudioAfade::InitFilterGraph() {
   int ret = avfilter_graph_create_filter(&src_ctx_, abuffer, "in", args,
                                          nullptr, filter_graph_);
   if (ret < 0) {
-    std::cerr << "❌ Failed to create abuffer filter" << std::endl;
+    LOG_ERROR("❌ Failed to create abuffer filter");
     return false;
   }
-  std::cout << "🎬 abuffer args: " << args << std::endl;
+  LOG_INFO("🎬 abuffer args: {}", args);
 
   // ---- 2️⃣ aformat 自动格式转换 ----
   const AVFilter *aformat = avfilter_get_by_name("aformat");
@@ -102,10 +98,10 @@ bool AudioAfade::InitFilterGraph() {
   ret = avfilter_graph_create_filter(&aformat_ctx, aformat, "aformat",
                                      aformat_args, nullptr, filter_graph_);
   if (ret < 0) {
-    std::cerr << "❌ Failed to create aformat filter" << std::endl;
+    LOG_ERROR("❌ Failed to create aformat filter");
     return false;
   }
-  std::cout << "🎬 aformat args = " << aformat_args << std::endl;
+  LOG_INFO("🎬 aformat args = {}", aformat_args);
 
   // ---- 3️⃣ afade ----
   const AVFilter *afade = avfilter_get_by_name("afade");
@@ -117,20 +113,20 @@ bool AudioAfade::InitFilterGraph() {
   ret = avfilter_graph_create_filter(&fade_ctx, afade, "fade",
                                      fade_args.c_str(), nullptr, filter_graph_);
   if (ret < 0) {
-    std::cerr << "❌ Failed to create afade filter" << std::endl;
+    LOG_ERROR("❌ Failed to create afade filter");
     return false;
   }
-  std::cout << "🎬 afade args = " << fade_args << std::endl;
+  LOG_INFO("🎬 afade args = {}", fade_args);
 
   // ---- 4️⃣ abuffersink ----
   const AVFilter *abuffersink = avfilter_get_by_name("abuffersink");
   ret = avfilter_graph_create_filter(&sink_ctx_, abuffersink, "out", nullptr,
                                      nullptr, filter_graph_);
   if (ret < 0) {
-    std::cerr << "❌ Failed to create abuffersink filter" << std::endl;
+    LOG_ERROR("❌ Failed to create abuffersink filter");
     return false;
   }
-  std::cout << "✅ abuffersink created" << std::endl;
+  LOG_INFO("✅ abuffersink created");
 
   // ---- 5️⃣ 链接滤镜链 ----
   avfilter_link(src_ctx_, 0, aformat_ctx, 0);
@@ -140,24 +136,24 @@ bool AudioAfade::InitFilterGraph() {
   // ---- 6️⃣ 配置滤镜图 ----
   ret = avfilter_graph_config(filter_graph_, nullptr);
   if (ret < 0) {
-    std::cerr << "❌ Failed to configure filter graph" << std::endl;
+    LOG_ERROR("❌ Failed to configure filter graph");
     return false;
   }
-  std::cout << "✅ Filter graph configured successfully" << std::endl;
+  LOG_INFO("✅ Filter graph configured successfully");
 
   return true;
 }
 
 bool AudioAfade::Process(AVPacket *src_pkt, AVPacket *dst_pkt) {
   if (avcodec_send_packet(dec_ctx_, src_pkt) < 0) {
-    std::cerr << "❌ Failed to send packet to decoder" << std::endl;
+    LOG_ERROR("❌ Failed to send packet to decoder");
     return false;
   }
 
   AVFrame *frame = av_frame_alloc();
   while (avcodec_receive_frame(dec_ctx_, frame) == 0) {
-    std::cout << "🔑 Decoded frame: pts=" << frame->pts
-              << ", nb_samples=" << frame->nb_samples << std::endl;
+    LOG_INFO("🔑 Decoded frame: pts={}, nb_samples={}", frame->pts,
+             frame->nb_samples);
 
     // 处理解码后的帧（淡入/淡出）
     frame->pts = pts_counter_;
@@ -166,10 +162,8 @@ bool AudioAfade::Process(AVPacket *src_pkt, AVPacket *dst_pkt) {
     SendToFilter(frame);
 
     // 从滤镜获取数据
-    std::cout << "⚙️ Receiving frame from filter..." << std::endl;
     ReceiveFromFilter(*dst_pkt); // 填充 dst_pkt
-    std::cout << "🔑 Frame processed, dst_pkt size=" << dst_pkt->size
-              << std::endl;
+    LOG_INFO("🔑 Frame processed, dst_pkt size={}", dst_pkt->size);
 
     av_frame_unref(frame);
   }
@@ -179,18 +173,16 @@ bool AudioAfade::Process(AVPacket *src_pkt, AVPacket *dst_pkt) {
 }
 
 bool AudioAfade::SendToFilter(AVFrame *frame) {
-  std::cout << "⚙️ Sending frame to filter... "
-            << "fmt=" << av_get_sample_fmt_name((AVSampleFormat)frame->format)
-            << " nb_samples=" << frame->nb_samples
-            << " channels=" << frame->channels
-            << " sample_rate=" << frame->sample_rate << std::endl;
+  LOG_INFO("⚙️ Sending frame to filter... fmt={}, nb_samples={}, "
+           "channels={}, sample_rate={}",
+           av_get_sample_fmt_name((AVSampleFormat)frame->format),
+           frame->nb_samples, frame->channels, frame->sample_rate);
 
   int ret = av_buffersrc_add_frame(src_ctx_, frame);
   if (ret < 0) {
     char errbuf[128];
     av_strerror(ret, errbuf, sizeof(errbuf));
-    std::cerr << "❌ Failed to send frame to filter (" << ret << "): " << errbuf
-              << std::endl;
+    LOG_ERROR("❌ Failed to send frame to filter ({}): {}", ret, errbuf);
     return false;
   }
 
@@ -204,11 +196,11 @@ bool AudioAfade::ReceiveFromFilter(AVPacket &out_pkt) {
   int ret = 0;
 
   while ((ret = av_buffersink_get_frame(sink_ctx_, faded_frame)) >= 0) {
-    std::cout << "🎵 Got faded frame from filter: "
-              << "nb_samples=" << faded_frame->nb_samples << ", format="
-              << av_get_sample_fmt_name((AVSampleFormat)faded_frame->format)
-              << ", channels=" << faded_frame->channels
-              << ", pts=" << faded_frame->pts << std::endl;
+    LOG_INFO("🎵 Got faded frame from filter: nb_samples={}, format={}, "
+             "channels={}, pts={}",
+             faded_frame->nb_samples,
+             av_get_sample_fmt_name((AVSampleFormat)faded_frame->format),
+             faded_frame->channels, faded_frame->pts);
 
     total_frames++;
 
@@ -217,7 +209,7 @@ bool AudioAfade::ReceiveFromFilter(AVPacket &out_pkt) {
     if (ret < 0) {
       char errbuf[128];
       av_strerror(ret, errbuf, sizeof(errbuf));
-      std::cerr << "❌ Failed to send frame to encoder: " << errbuf << std::endl;
+      LOG_ERROR("❌ Failed to send frame to encoder: {}", errbuf);
       av_frame_unref(faded_frame);
       continue;
     }
@@ -226,9 +218,8 @@ bool AudioAfade::ReceiveFromFilter(AVPacket &out_pkt) {
     av_init_packet(&tmp_pkt);
 
     while ((ret = avcodec_receive_packet(enc_ctx_, &tmp_pkt)) >= 0) {
-      std::cout << "📦 Encoded packet: size=" << tmp_pkt.size
-                << ", pts=" << tmp_pkt.pts << ", dts=" << tmp_pkt.dts
-                << std::endl;
+      LOG_INFO("📦 Encoded packet: size={}, pts={}, dts={}", tmp_pkt.size,
+               tmp_pkt.pts, tmp_pkt.dts);
 
       // ✅ 拷贝输出数据
       out_pkt.data = (uint8_t *)av_malloc(tmp_pkt.size);
@@ -243,8 +234,7 @@ bool AudioAfade::ReceiveFromFilter(AVPacket &out_pkt) {
     if (ret != AVERROR(EAGAIN) && ret < 0) {
       char errbuf[128];
       av_strerror(ret, errbuf, sizeof(errbuf));
-      std::cerr << "⚠️ avcodec_receive_packet returned error: " << errbuf
-                << std::endl;
+      LOG_ERROR("⚠️ avcodec_receive_packet returned error: {}", errbuf);
     }
 
     av_frame_unref(faded_frame);
@@ -253,14 +243,13 @@ bool AudioAfade::ReceiveFromFilter(AVPacket &out_pkt) {
   if (ret != AVERROR_EOF && ret != AVERROR(EAGAIN) && ret < 0) {
     char errbuf[128];
     av_strerror(ret, errbuf, sizeof(errbuf));
-    std::cerr << "❌ Failed to get frame from filter: " << errbuf << std::endl;
+    LOG_ERROR("❌ Failed to get frame from filter: {}", errbuf);
   }
 
   av_frame_free(&faded_frame);
 
-  std::cout << "✅ Filter output done. "
-            << "Total frames=" << total_frames
-            << ", encoded packets=" << total_packets << std::endl;
+  LOG_INFO("✅ Filter output done. Total frames={}, encoded packets={}",
+           total_frames, total_packets);
 
   return total_packets > 0;
 }

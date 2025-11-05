@@ -103,3 +103,10 @@
 /data1/lijinwang/ctest/build/third_party/prometheus-cpp/push/tests/internal/CMakeFiles/rebuild_cache.dir
 /data1/lijinwang/ctest/build/third_party/prometheus-cpp/push/tests/internal/CMakeFiles/edit_cache.dir
 /data1/lijinwang/ctest/build/third_party/prometheus-cpp/push/tests/internal/CMakeFiles/prometheus_push_internal_test.dir
+/data1/lijinwang/ctest/build/third_party/spdlog-1.10.0/CMakeFiles/install/strip.dir
+/data1/lijinwang/ctest/build/third_party/spdlog-1.10.0/CMakeFiles/install/local.dir
+/data1/lijinwang/ctest/build/third_party/spdlog-1.10.0/CMakeFiles/edit_cache.dir
+/data1/lijinwang/ctest/build/third_party/spdlog-1.10.0/CMakeFiles/install.dir
+/data1/lijinwang/ctest/build/third_party/spdlog-1.10.0/CMakeFiles/list_install_components.dir
+/data1/lijinwang/ctest/build/third_party/spdlog-1.10.0/CMakeFiles/rebuild_cache.dir
+/data1/lijinwang/ctest/build/third_party/spdlog-1.10.0/CMakeFiles/spdlog.dir

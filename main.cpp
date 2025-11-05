@@ -8,6 +8,7 @@ extern "C" {
 #include <libavformat/avformat.h>
 }
 #include "audio_afade.h"
+#include "logger.h"
 
 using namespace std::chrono;
 
@@ -63,17 +64,25 @@ inline std::string packet_to_string(const AVPacket *pkt) {
   return std::string(reinterpret_cast<const char *>(pkt->data), pkt->size);
 }
 
-int main() {
-  av_log_set_level(AV_LOG_DEBUG);
+int initLog() {
+  if (!LOGGER_INS->Init("info", "./", 0, true, true)) {
+    return -1;
+  }
+}
 
-  const char *input_file = "/data1/lijinwang/ctest/build/input_44100_stereo.mp3";
+int main() {
+  initLog();
+  av_log_set_level(AV_LOG_ERROR);
+
+  const char *input_file =
+      "/data1/lijinwang/ctest/build/input_44100_stereo.mp3";
   // const char *input_file = "/data1/lijinwang/ctest/build/input2.mp3";
   const char *output_file = "output.mp3";
 
   // 打开输入文件
   AVFormatContext *in_fmt = nullptr;
   if (avformat_open_input(&in_fmt, input_file, nullptr, nullptr) < 0) {
-    std::cerr << "❌ Failed to open input file\n";
+    LOG_ERROR("❌ Failed to open input file: {}", input_file);
     return -1;
   }
   avformat_find_stream_info(in_fmt, nullptr);
@@ -87,7 +96,7 @@ int main() {
     }
   }
   if (audio_stream_index < 0) {
-    std::cerr << "❌ No audio stream found\n";
+    LOG_ERROR("❌ No audio stream found in file: {}", input_file);
     return -1;
   }
 
@@ -97,9 +106,8 @@ int main() {
   int channels = in_stream->codecpar->channels;
   AVSampleFormat sample_fmt = (AVSampleFormat)in_stream->codecpar->format;
 
-  std::cout << "🎧 Input stream: sample_rate=" << sample_rate
-            << ", channels=" << channels
-            << ", format=" << av_get_sample_fmt_name(sample_fmt) << std::endl;
+  LOG_INFO("Input stream: sample_rate={}, channels={}, format=", sample_rate,
+           channels, av_get_sample_fmt_name(sample_fmt));
 
   // ✅ 初始化 AudioAfade（前 200 帧淡入）
   // AudioAfade afade(sample_rate, channels, AudioAfade::FADE_IN, 200);
@@ -108,7 +116,7 @@ int main() {
   AVFormatContext *out_fmt = nullptr;
   avformat_alloc_output_context2(&out_fmt, nullptr, nullptr, output_file);
   if (!out_fmt) {
-    std::cerr << "❌ Could not create output context\n";
+    LOG_ERROR("❌ Could not create output context");
     return -1;
   }
 
@@ -120,7 +128,7 @@ int main() {
   // 打开输出文件
   if (!(out_fmt->oformat->flags & AVFMT_NOFILE)) {
     if (avio_open(&out_fmt->pb, output_file, AVIO_FLAG_WRITE) < 0) {
-      std::cerr << "❌ Could not open output file\n";
+      LOG_ERROR("❌ Could not open output file: {}", output_file);
       return -1;
     }
   }
@@ -142,7 +150,7 @@ int main() {
 
     frame_count++;
     if (frame_count == 100) {
-      std::cout << "🎬 Fade-in triggered at frame " << frame_count << std::endl;
+      LOG_INFO("🎬 Fade-in triggered at frame {}", frame_count);
       int sample_rate = in_stream->codecpar->sample_rate;
       int channels = in_stream->codecpar->channels;
       afade = std::make_unique<AudioAfade>(sample_rate, channels, sample_fmt,
@@ -166,7 +174,7 @@ int main() {
 
       // 当淡入200帧后销毁
       if (frame_count >= 300) {
-        std::cout << "✅ Fade-in finished at frame " << frame_count << std::endl;
+        LOG_INFO("✅ Fade-in finished at frame {}", frame_count);
         fading = false;
         afade.reset();
       }
@@ -187,6 +195,6 @@ int main() {
     avio_closep(&out_fmt->pb);
   avformat_free_context(out_fmt);
 
-  std::cout << "✅ 输出完成: " << output_file << "（已应用前 200 帧淡入效果）\n";
+  LOG_INFO("✅ 输出完成: {}（已应用前 200 帧淡入效果）", output_file);
   return 0;
 }

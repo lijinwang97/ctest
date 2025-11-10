@@ -65,7 +65,7 @@ inline std::string packet_to_string(const AVPacket *pkt) {
 }
 
 int initLog() {
-  if (!LOGGER_INS->Init("info", "./", 0, true, true)) {
+  if (!LOGGER_INS->Init("info", "./log", 0, true, true)) {
     return -1;
   }
 }
@@ -74,10 +74,10 @@ int main() {
   initLog();
   av_log_set_level(AV_LOG_ERROR);
 
-  const char *input_file =
-      "/data1/lijinwang/ctest/build/input_44100_stereo.mp3";
+  const char *input_file = "/data1/lijinwang/ctest/build/input.aac";
   // const char *input_file = "/data1/lijinwang/ctest/build/input2.mp3";
-  const char *output_file = "output.mp3";
+  const char *output_file = "output_my.aac";
+  const char *fade_output_file = "fade_output.aac";
 
   // 打开输入文件
   AVFormatContext *in_fmt = nullptr;
@@ -135,6 +135,28 @@ int main() {
 
   avformat_write_header(out_fmt, nullptr);
 
+  // ---- 初始化淡入输出文件 ----
+  AVFormatContext *fade_out_fmt = nullptr;
+  avformat_alloc_output_context2(&fade_out_fmt, nullptr, nullptr,
+                                 fade_output_file);
+  if (!fade_out_fmt) {
+    LOG_ERROR("❌ Could not create fade output context for {}",
+              fade_output_file);
+    return -1;
+  }
+
+  AVStream *fade_out_stream = avformat_new_stream(fade_out_fmt, nullptr);
+  avcodec_parameters_copy(fade_out_stream->codecpar, in_stream->codecpar);
+  fade_out_stream->codecpar->codec_tag = 0;
+
+  if (!(fade_out_fmt->oformat->flags & AVFMT_NOFILE)) {
+    if (avio_open(&fade_out_fmt->pb, fade_output_file, AVIO_FLAG_WRITE) < 0) {
+      LOG_ERROR("❌ Could not open fade output file: {}", fade_output_file);
+      return -1;
+    }
+  }
+  avformat_write_header(fade_out_fmt, nullptr);
+
   int frame_count = 0;
   bool fading = false;
   std::unique_ptr<AudioAfade> afade;
@@ -151,36 +173,88 @@ int main() {
     frame_count++;
     if (frame_count == 100) {
       LOG_INFO("🎬 Fade-in triggered at frame {}", frame_count);
-      int sample_rate = in_stream->codecpar->sample_rate;
-      int channels = in_stream->codecpar->channels;
       afade = std::make_unique<AudioAfade>(sample_rate, channels, sample_fmt,
-                                           AudioAfade::FADE_IN, 100);
+                                           AudioAfade::FADE_IN, 200);
       fading = true;
     }
 
+    // if (fading && afade) {
+    //   AVPacket faded_pkt;
+    //   av_init_packet(&faded_pkt);
+
+    //   LOG_INFO("🎧 Write before packet: size={}, pts={}, dts={}",
+    //              pkt.size, pkt.pts, pkt.dts);
+
+    //   if (afade->Process(&pkt, &faded_pkt) && faded_pkt.size > 0) {
+    //     faded_pkt.stream_index = 0;
+
+    //     LOG_INFO("🎧 Write faded packet: size={}, pts={}, dts={}",
+    //              faded_pkt.size, faded_pkt.pts, faded_pkt.dts);
+
+    //     int ret = av_interleaved_write_frame(fade_out_fmt, &faded_pkt);
+    //     if (ret < 0) {
+    //       char errbuf[128];
+    //       av_strerror(ret, errbuf, sizeof(errbuf));
+    //       LOG_ERROR(" Write faded packet failed: {}", errbuf);
+    //     }
+
+    //     av_packet_unref(&faded_pkt);
+    //   }
+
+    //   // 当淡入200帧后销毁
+    //   if (frame_count >= 300) {
+    //     LOG_INFO(" Fade-in finished at frame {}", frame_count);
+    //     fading = false;
+    //     afade.reset();
+    //   }
+    // }
+
     if (fading && afade) {
-      AVPacket faded_pkt;
-      av_init_packet(&faded_pkt);
+      LOG_INFO("🎧 Write before packet: size={}, pts={}, dts={}", pkt.size,
+               pkt.pts, pkt.dts);
 
-      afade->Process(&pkt, &faded_pkt);
+      // 1️⃣ 输出缓冲区（ProcessRaw 输出的数据）
+      std::string out_buf;
 
-      // 写入渐入后的包
-      if (faded_pkt.size > 0) {
+      // 2️⃣ 调用 ProcessRaw —— 输入原始音频字节流
+      if (afade->ProcessRaw(reinterpret_cast<const char *>(pkt.data), pkt.size,
+                            out_buf) &&
+          !out_buf.empty()) {
+
+        // 3️⃣ 把 out_buf 封装回 AVPacket
+        AVPacket faded_pkt;
+        av_init_packet(&faded_pkt);
+
+        faded_pkt.data =
+            reinterpret_cast<uint8_t *>(const_cast<char *>(out_buf.data()));
+        faded_pkt.size = static_cast<int>(out_buf.size());
         faded_pkt.stream_index = 0;
-        av_interleaved_write_frame(out_fmt, &faded_pkt);
+
+        LOG_INFO("🎧 Write faded packet: size={}, pts={}, dts={}",
+                 faded_pkt.size, faded_pkt.pts, faded_pkt.dts);
+
+        // 4️⃣ 写入淡入输出文件
+        int ret = av_interleaved_write_frame(fade_out_fmt, &faded_pkt);
+        if (ret < 0) {
+          char errbuf[128];
+          av_strerror(ret, errbuf, sizeof(errbuf));
+          LOG_ERROR("❌ Write faded packet failed: {}", errbuf);
+        }
+
+        av_packet_unref(&faded_pkt);
       }
 
-      av_packet_unref(&faded_pkt);
-
-      // 当淡入200帧后销毁
+      // 5️⃣ 超过 200 帧后结束淡入
       if (frame_count >= 300) {
         LOG_INFO("✅ Fade-in finished at frame {}", frame_count);
         fading = false;
         afade.reset();
       }
     } else {
-      // 🟢 正常写入
       pkt.stream_index = 0;
+      LOG_INFO("🎧 Write original packet: size={}, pts={}, dts={}", pkt.size,
+               pkt.pts, pkt.dts);
+
       av_interleaved_write_frame(out_fmt, &pkt);
     }
 
@@ -188,13 +262,19 @@ int main() {
   }
 
   av_write_trailer(out_fmt);
+  av_write_trailer(fade_out_fmt);
 
   // 资源清理
   avformat_close_input(&in_fmt);
   if (!(out_fmt->oformat->flags & AVFMT_NOFILE))
     avio_closep(&out_fmt->pb);
+
+  if (!(fade_out_fmt->oformat->flags & AVFMT_NOFILE))
+    avio_closep(&fade_out_fmt->pb);
   avformat_free_context(out_fmt);
+  avformat_free_context(fade_out_fmt);
 
   LOG_INFO("✅ 输出完成: {}（已应用前 200 帧淡入效果）", output_file);
+  LOG_INFO("✅ 淡入输出完成: {}", fade_output_file);
   return 0;
 }

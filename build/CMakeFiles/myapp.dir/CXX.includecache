@@ -914,6 +914,16 @@ spdlog-inl.h
 
 ../third_party/spdlog-1.10.0/include/spdlog/version.h
 
+/data1/lijinwang/ctest/audio_afade.cc
+audio_afade.h
+/data1/lijinwang/ctest/audio_afade.h
+logger.h
+/data1/lijinwang/ctest/logger.h
+algorithm
+-
+iostream
+-
+
 /data1/lijinwang/ctest/audio_afade.h
 memory
 -
@@ -927,11 +937,15 @@ libavfilter/buffersink.h
 -
 libavfilter/buffersrc.h
 -
-libswresample/swresample.h
--
 libavutil/opt.h
 -
 libavutil/time.h
+-
+libswresample/swresample.h
+-
+cstdint
+-
+vector
 -
 
 /data1/lijinwang/ctest/av_metrics.h

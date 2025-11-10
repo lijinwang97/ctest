@@ -1,3 +1,6 @@
 .vscode/
 build/
 .clang-format
+*.mp3
+*.aac
+logs/

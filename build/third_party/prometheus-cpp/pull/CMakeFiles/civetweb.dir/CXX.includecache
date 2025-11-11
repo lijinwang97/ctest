@@ -6,33 +6,3 @@
 
 #IncludeRegexTransform: 
 
-../third_party/prometheus-cpp/3rdparty/civetweb/include/CivetServer.h
-civetweb.h
-../third_party/prometheus-cpp/3rdparty/civetweb/include/civetweb.h
-map
--
-stdexcept
--
-string
--
-vector
--
-
-../third_party/prometheus-cpp/3rdparty/civetweb/include/civetweb.h
-stddef.h
--
-stdio.h
--
-sal.h
--
-
-/data1/lijinwang/ctest/third_party/prometheus-cpp/3rdparty/civetweb/src/CivetServer.cpp
-CivetServer.h
-/data1/lijinwang/ctest/third_party/prometheus-cpp/3rdparty/civetweb/src/CivetServer.h
-assert.h
--
-stdexcept
--
-string.h
--
-

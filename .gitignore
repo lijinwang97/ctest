@@ -4,3 +4,5 @@ build/
 *.mp3
 *.aac
 logs/
+log/
+build/

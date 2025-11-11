@@ -1,7 +1,9 @@
 #include "audio_afade.h"
 #include "logger.h"
 #include <algorithm>
+#include <iomanip> // std::hex, std::setw, std::setfill
 #include <iostream>
+#include <sstream> // std::ostringstream
 
 AudioAfade::AudioAfade(int sample_rate, int channels, AVSampleFormat sample_fmt,
                        FadeType type, int total_frames)
@@ -196,6 +198,12 @@ bool AudioAfade::Process(AVPacket *src_pkt, AVPacket *dst_pkt) {
 
     SendToFilter(frame);
 
+    // 清理上一次的数据
+    av_packet_unref(dst_pkt);
+    av_init_packet(dst_pkt);
+    dst_pkt->data = nullptr;
+    dst_pkt->size = 0;
+
     // 从滤镜获取数据
     ReceiveFromFilter(*dst_pkt); // 填充 dst_pkt
     LOG_INFO("Process end frame processed, dst_pkt size={} pts={}, dts={}",
@@ -206,6 +214,30 @@ bool AudioAfade::Process(AVPacket *src_pkt, AVPacket *dst_pkt) {
 
   av_frame_free(&frame);
   return true;
+}
+
+void AudioAfade::FlushEncoder(AVFormatContext *out_fmt, int64_t &next_pts) {
+  LOG_INFO("Flushing AAC encoder...");
+  int ret = avcodec_send_frame(enc_ctx_, nullptr); // 发送空帧触发 flush
+  if (ret < 0) {
+    char errbuf[128];
+    av_strerror(ret, errbuf, sizeof(errbuf));
+    LOG_ERROR("Failed to flush encoder: {}", errbuf);
+    return;
+  }
+
+  AVPacket pkt;
+  av_init_packet(&pkt);
+  while (avcodec_receive_packet(enc_ctx_, &pkt) >= 0) {
+    pkt.stream_index = 0;
+    pkt.pts = pkt.dts = next_pts;
+    next_pts += 1024;
+
+    LOG_INFO("🎧 Write flush packet: size={}, pts={}, dts={}", pkt.size, pkt.pts,
+             pkt.dts);
+    av_interleaved_write_frame(out_fmt, &pkt);
+    av_packet_unref(&pkt);
+  }
 }
 
 bool AudioAfade::ProcessRaw(const char *in_buf, int in_len,
@@ -230,10 +262,17 @@ bool AudioAfade::ProcessRaw(const char *in_buf, int in_len,
     return false;
   }
 
-  out_buf.assign(reinterpret_cast<const char *>(dst_pkt.data), dst_pkt.size);
+  uint8_t adts_header[7];
+  int profile = 2; // AAC LC
+  WriteAdtsHeader(adts_header, dst_pkt.size, profile, sample_rate_, channels_);
 
-  LOG_INFO("ProcessRaw success: input={} bytes -> output={} bytes", in_len,
-           out_buf.size());
+  // 拼接 ADTS + AAC
+  out_buf.resize(7 + dst_pkt.size);
+  memcpy((void *)out_buf.data(), adts_header, 7);
+  memcpy((void *)(out_buf.data() + 7), dst_pkt.data, dst_pkt.size);
+
+  LOG_INFO("ProcessRaw success: input={} bytes -> output={} bytes Hex dump:{}",
+           in_len, out_buf.size(), PrintHexPreview(out_buf, 64));
 
   av_packet_unref(&dst_pkt);
   return true;
@@ -266,12 +305,15 @@ bool AudioAfade::ReceiveFromFilter(AVPacket &out_pkt) {
   av_packet_unref(&out_pkt);
 
   while ((ret = av_buffersink_get_frame(sink_ctx_, faded_frame)) >= 0) {
+    int bytes_per_sample =
+        av_get_bytes_per_sample((AVSampleFormat)faded_frame->format);
+    int frame_bytes =
+        faded_frame->nb_samples * faded_frame->channels * bytes_per_sample;
     LOG_INFO("ReceiveFromFilter Got faded frame from filter: nb_samples={}, "
-             "format={}, "
-             "channels={}, pts={}",
+             "format={}, channels={}, pts={} frame_size=:{}",
              faded_frame->nb_samples,
              av_get_sample_fmt_name((AVSampleFormat)faded_frame->format),
-             faded_frame->channels, faded_frame->pts);
+             faded_frame->channels, faded_frame->pts, frame_bytes);
     total_frames++;
 
     ret = avcodec_send_frame(enc_ctx_, faded_frame);
@@ -302,6 +344,12 @@ bool AudioAfade::ReceiveFromFilter(AVPacket &out_pkt) {
 
       LOG_INFO("ReceiveFromFilter Encoded packet: size={}, pts={}, dts={}",
                tmp_pkt.size, tmp_pkt.pts, tmp_pkt.dts);
+
+      LOG_INFO(
+          "Encoded pkt: size={} stream_index={} codec={} keyframe={} flags={}",
+          tmp_pkt.size, tmp_pkt.stream_index,
+          avcodec_get_name(enc_ctx_->codec_id), tmp_pkt.flags & AV_PKT_FLAG_KEY,
+          tmp_pkt.flags);
 
       av_packet_unref(&out_pkt);
       av_packet_move_ref(&out_pkt, &tmp_pkt);
@@ -336,5 +384,63 @@ bool AudioAfade::ReceiveFromFilter(AVPacket &out_pkt) {
   }
 
   av_frame_free(&faded_frame);
+  LOG_INFO("Filter output done. Total frames={}, encoded packets=={}",
+           total_frames, total_packets);
   return total_packets > 0;
+}
+
+void AudioAfade::PrintPacketHex(const AVPacket *pkt, int max_bytes) {
+  int print_len = std::min(pkt->size, max_bytes);
+  std::ostringstream oss;
+  oss << std::hex << std::setfill('0');
+
+  for (int i = 0; i < print_len; i++) {
+    oss << std::setw(2) << (int)pkt->data[i] << " ";
+  }
+  if (pkt->size > max_bytes)
+    oss << "...";
+  LOG_INFO("Encoded AAC packet (size={}): {}", pkt->size, oss.str());
+}
+
+void AudioAfade::WriteAdtsHeader(uint8_t *adts_header, int aac_length,
+                                 int profile, int sample_rate, int channels) {
+  // 采样率索引表（ISO 14496-3 Table 1.16）
+  static const int freq_tbl[13] = {96000, 88200, 64000, 48000, 44100,
+                                   32000, 24000, 22050, 16000, 12000,
+                                   11025, 8000,  7350};
+  int freq_idx = 4; // 默认44100Hz
+  for (int i = 0; i < 13; i++) {
+    if (freq_tbl[i] == sample_rate) {
+      freq_idx = i;
+      break;
+    }
+  }
+
+  int frame_length = aac_length + 7;
+
+  adts_header[0] = 0xFF;
+  adts_header[1] = 0xF1; // 1111 1111 1111 0001 (MPEG-4, Layer=0)
+  adts_header[2] = ((profile - 1) << 6) | (freq_idx << 2) | (channels >> 2);
+  adts_header[3] = ((channels & 3) << 6) | ((frame_length >> 11) & 0x03);
+  adts_header[4] = (frame_length >> 3) & 0xFF;
+  adts_header[5] = ((frame_length & 7) << 5) | 0x1F;
+  adts_header[6] = 0xFC;
+}
+
+std::string PrintHexPreview(const std::string &buf,
+                                        size_t max_bytes) {
+  std::ostringstream oss;
+  oss << std::hex << std::setfill('0');
+
+  size_t print_len = std::min(buf.size(), max_bytes);
+  for (size_t i = 0; i < print_len; ++i) {
+    // 每个字节转成两位十六进制
+    oss << std::setw(2)
+        << static_cast<unsigned>(static_cast<unsigned char>(buf[i])) << " ";
+  }
+
+  if (buf.size() > max_bytes)
+    oss << "...";
+
+  return oss.str();
 }
